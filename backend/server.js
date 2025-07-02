@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+
+
 require('dotenv').config();
 
 const app = express();
@@ -32,11 +34,13 @@ app.use((req, res, next) => {
 const analysisRoutes = require('./routes/analysis');
 const competitorRoutes = require('./routes/competitors');
 const recommendationRoutes = require('./routes/recommendations');
+const reportRoutes = require('./routes/reports');
 
 // Apply routes
 app.use('/api', analysisRoutes);
 app.use('/api', competitorRoutes);
 app.use('/api', recommendationRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
