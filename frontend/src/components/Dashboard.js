@@ -21,6 +21,7 @@ import ScoreCard from './ScoreCard';
 import CompetitorGrid from './CompetitorGrid';
 import RecommendationsList from './RecommendationsList';
 import reportService from '../services/reportService';
+import Footer from './Footer';
 
 const Dashboard = () => {
   const [websiteUrl, setWebsiteUrl] = useState('');
@@ -564,6 +565,7 @@ const Dashboard = () => {
             </div>
           </div>
         )}
+        <Footer />
       </div>
     </div>
   );
