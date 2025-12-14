@@ -6,93 +6,149 @@ class ApiService {
   constructor() {
     this.api = axios.create({
       baseURL: API_BASE_URL,
-      timeout: 60000, // Increased timeout
+      timeout: 60000, // UPDATED: Increased to 60 seconds for better URL handling
       headers: {
         'Content-Type': 'application/json',
       },
     });
 
-    // Request interceptor
+    // UPDATED: Enhanced request interceptor
     this.api.interceptors.request.use(
       (config) => {
-        console.log('🚀 API Request:', config.method?.toUpperCase(), config.url);
-        console.log('📍 Full URL:', `${config.baseURL}${config.url}`);
+        console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
+        if (config.data?.url) {
+          console.log(`📍 Target URL: ${config.data.url}`);
+        }
         return config;
       },
-      (error) => Promise.reject(error)
+      (error) => {
+        console.error('🚨 API Request Error:', error);
+        return Promise.reject(error);
+      }
     );
 
-    // Response interceptor
+    // UPDATED: Enhanced response interceptor
     this.api.interceptors.response.use(
       (response) => {
-        console.log('✅ API Response:', response.status, response.config.url);
+        console.log(`✅ API Response: ${response.status} ${response.config.url}`);
+        if (response.data?.analysis?.urlInfo) {
+          console.log(`🔄 URL Processing:`, response.data.analysis.urlInfo);
+        }
         return response;
       },
       (error) => {
-        console.error('❌ API Error Details:', {
-          status: error.response?.status,
-          message: error.message,
-          url: error.config?.url,
-          baseURL: error.config?.baseURL
-        });
-        
-        // Better error messages
-        if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
-          throw new Error('Backend server is not running. Please start with: npm run dev');
-        }
-        
+        console.error('🚨 API Response Error:', error.response?.data || error.message);
         return Promise.reject(error);
       }
     );
   }
 
-  // Test connection
-  async testConnection() {
+  // NEW: URL validation method
+  async validateUrl(url) {
     try {
-      const response = await this.api.get('/test');
-      console.log('✅ API Connection Test:', response.data);
+      console.log(`🔍 Validating URL: ${url}`);
+      const response = await this.api.post('/analysis/validate', { url });
+      console.log(`✅ URL validation result:`, response.data);
       return response.data;
     } catch (error) {
-      console.error('❌ API Connection Failed:', error.message);
-      throw error;
+      console.error(`❌ URL validation failed for ${url}:`, error);
+      throw this.handleError(error, 'URL validation failed');
     }
   }
 
-  async analyzeWebsite(websiteUrl) {
+  // UPDATED: Enhanced website analysis method
+  async analyzeWebsite(url) {
     try {
-      console.log('🔍 Analyzing website:', websiteUrl);
-      const response = await this.api.post('/analyze', {
-        url: websiteUrl,
-      });
-      return response.data.data || response.data; // Handle both formats
+      console.log(`🔍 Starting website analysis for: ${url}`);
+      const response = await this.api.post('/analysis/analyze', { url });
+      
+      const result = response.data;
+      console.log(`✅ Analysis completed for: ${result.analysis?.urlInfo?.normalized || url}`);
+      
+      // Log analysis summary
+      if (result.analysis) {
+        console.log(`📊 Analysis Summary:`, {
+          score: result.analysis.geoScore,
+          grade: result.analysis.grade,
+          businessType: result.analysis.businessType,
+          urlProcessed: result.analysis.urlInfo
+        });
+      }
+      
+      return result;
     } catch (error) {
-      throw new Error(error.response?.data?.message || error.message || 'Analysis failed');
+      console.error(`❌ Website analysis failed for ${url}:`, error);
+      throw this.handleError(error, 'Website analysis failed');
     }
   }
 
-  async getCompetitors(websiteUrl, businessType) {
+  // UPDATED: Enhanced competitor analysis
+  async getCompetitors(url, businessType) {
     try {
-      console.log('🏢 Finding competitors for:', websiteUrl, businessType);
-      const response = await this.api.post('/competitors', {
-        url: websiteUrl,
-        businessType,
+      console.log(`🏢 Getting competitors for: ${url} (${businessType})`);
+      const response = await this.api.post('/analysis/competitors', { 
+        url, 
+        businessType 
       });
-      return response.data.data || response.data; // Handle both formats
+      
+      const competitors = response.data.data || [];
+      console.log(`✅ Found ${competitors.length} competitors`);
+      return response.data;
     } catch (error) {
-      throw new Error(error.response?.data?.message || error.message || 'Competitor analysis failed');
+      console.error(`❌ Competitor analysis failed for ${url}:`, error);
+      throw this.handleError(error, 'Competitor analysis failed');
     }
   }
 
-  async getTechnicalRecommendations(websiteUrl, currentScore) {
+  // UPDATED: Enhanced recommendations
+  async getRecommendations(url, currentScore) {
     try {
-      console.log('💡 Generating recommendations for:', websiteUrl);
-      const response = await this.api.post('/recommendations', {
-        url: websiteUrl,
-        currentScore,
+      console.log(`💡 Getting recommendations for: ${url} (Score: ${currentScore})`);
+      const response = await this.api.post('/analysis/recommendations', { 
+        url, 
+        currentScore 
       });
-      return response.data.data || response.data; // Handle both formats
+      
+      const recommendations = response.data.recommendations || [];
+      console.log(`✅ Generated ${recommendations.length} recommendations`);
+      return response.data;
     } catch (error) {
-      throw new Error(error.response?.data?.message || error.message || 'Recommendations failed');
+      console.error(`❌ Recommendations failed for ${url}:`, error);
+      throw this.handleError(error, 'Recommendations failed');
+    }
+  }
+
+  // NEW: Test API connection
+  async testConnection() {
+    try {
+      const response = await this.api.get('/analysis/test');
+      console.log('✅ API connection test successful:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ API connection test failed:', error);
+      throw this.handleError(error, 'API connection test failed');
+    }
+  }
+
+  // UPDATED: Enhanced error handling
+  handleError(error, defaultMessage) {
+    if (error.response) {
+      // Server responded with error status
+      const message = error.response.data?.message || defaultMessage;
+      const details = error.response.data?.error;
+      
+      console.error(`🚨 Server Error (${error.response.status}):`, message);
+      if (details) console.error('🔍 Error Details:', details);
+      
+      return new Error(message);
+    } else if (error.request) {
+      // Request made but no response received
+      console.error('🚨 Network Error: No response received');
+      return new Error('Network error - please check your connection and try again');
+    } else {
+      // Something else happened
+      console.error('🚨 Unexpected Error:', error.message);
+      return new Error(error.message || defaultMessage);
     }
   }
 }

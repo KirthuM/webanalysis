@@ -105,23 +105,13 @@ const Footer = () => {
                   rel="noopener noreferrer"
                   className="ml-1 font-medium hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                 >
-                  KirthuM
+                  ContexWeb
                 </a>
               </p>
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-300">
               © {currentYear} AI Website Analysis. All rights reserved.
             </div>
-          </div>
-        </div>
-
-        {/* Tech Stack Badge */}
-        <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex flex-wrap justify-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
-            <span className="bg-blue-100 dark:bg-blue-900/20 px-2 py-1 rounded">React</span>
-            <span className="bg-green-100 dark:bg-green-900/20 px-2 py-1 rounded">Node.js</span>
-            <span className="bg-purple-100 dark:bg-purple-900/20 px-2 py-1 rounded">OpenAI</span>
-            <span className="bg-orange-100 dark:bg-orange-900/20 px-2 py-1 rounded">Tailwind CSS</span>
           </div>
         </div>
       </div>

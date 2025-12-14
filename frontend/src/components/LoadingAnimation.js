@@ -31,7 +31,7 @@ const LoadingAnimation = ({ progress = 0 }) => {
         </div>
         
         <div className="text-2xl font-bold text-blue-600">
-          {progress}%
+          {progress.toFixed(2)}%
         </div>
       </div>
     </div>

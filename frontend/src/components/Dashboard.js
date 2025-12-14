@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+
+
+import React, { useState, useEffect } from 'react';
 import {
   Globe,
   Brain,
@@ -11,7 +13,9 @@ import {
   TrendingUp,
   Building,
   AlertCircle,
-  Loader2
+  Loader2,
+  Info,
+  ExternalLink
 } from 'lucide-react';
 import { useGeoAnalysis } from '../hooks/useGeoAnalysis';
 import { useTheme } from '../contexts/ThemeContext';
@@ -30,6 +34,11 @@ const Dashboard = () => {
   const [downloadMessage, setDownloadMessage] = useState(null);
   const [downloadingFormat, setDownloadingFormat] = useState(null);
 
+  // NEW: URL validation state
+  const [urlStatus, setUrlStatus] = useState(null);
+  const [urlValidationTimer, setUrlValidationTimer] = useState(null);
+  const [showUrlInfo, setShowUrlInfo] = useState(false);
+
   const {
     analysis,
     competitors,
@@ -40,12 +49,112 @@ const Dashboard = () => {
     performAnalysis,
   } = useGeoAnalysis();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (websiteUrl.trim()) {
-      await performAnalysis(websiteUrl.trim());
+  // NEW: URL validation function
+  const validateUrlInput = (inputUrl) => {
+    if (!inputUrl.trim()) {
+      setUrlStatus(null);
+      return;
+    }
+
+    try {
+      let testUrl = inputUrl.trim();
+      
+      // Add https:// if missing
+      if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
+        if (testUrl.startsWith('www.')) {
+          testUrl = `https://${testUrl}`;
+        } else {
+          testUrl = `https://${testUrl}`;
+        }
+      }
+      
+      new URL(testUrl);
+      
+      setUrlStatus({
+        isValid: true,
+        normalizedUrl: testUrl,
+        message: inputUrl !== testUrl ? `Will analyze: ${testUrl}` : 'URL looks good!',
+        showNormalized: inputUrl !== testUrl,
+        isInternal: isInternalUrl(testUrl)
+      });
+    } catch (error) {
+      setUrlStatus({
+        isValid: false,
+        message: 'Please enter a valid website URL (e.g., google.com, www.example.com)',
+        showNormalized: false
+      });
     }
   };
+
+  // NEW: Check if URL is internal/private
+  const isInternalUrl = (url) => {
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname.toLowerCase();
+      
+      return (
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname.startsWith('192.168.') ||
+        hostname.startsWith('10.') ||
+        hostname.startsWith('172.') ||
+        hostname.endsWith('.local') ||
+        hostname.endsWith('.internal')
+      );
+    } catch {
+      return false;
+    }
+  };
+
+  // NEW: Handle URL input changes with debounced validation
+  const handleUrlChange = (e) => {
+    const newUrl = e.target.value;
+    setWebsiteUrl(newUrl);
+    
+    // Clear existing timer
+    if (urlValidationTimer) {
+      clearTimeout(urlValidationTimer);
+    }
+    
+    // Set new timer for validation
+    const newTimer = setTimeout(() => {
+      validateUrlInput(newUrl);
+    }, 300); // Wait 300ms after user stops typing
+    
+    setUrlValidationTimer(newTimer);
+  };
+
+  // UPDATED: Enhanced submit function
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!websiteUrl.trim()) {
+      return;
+    }
+
+    if (!urlStatus?.isValid) {
+      return;
+    }
+
+    // Use normalized URL for analysis
+    const urlToAnalyze = urlStatus?.normalizedUrl || websiteUrl.trim();
+    
+    // Show URL processing info if URL was normalized
+    if (urlStatus?.showNormalized) {
+      setShowUrlInfo(true);
+    }
+    
+    await performAnalysis(urlToAnalyze);
+  };
+
+  // NEW: Clean up timer on component unmount
+  useEffect(() => {
+    return () => {
+      if (urlValidationTimer) {
+        clearTimeout(urlValidationTimer);
+      }
+    };
+  }, [urlValidationTimer]);
 
   const handleDownloadReport = async (format) => {
     if (!analysis) {
@@ -388,7 +497,10 @@ const Dashboard = () => {
       case 'dashboard':
         return (
           <div className="space-y-6">
-            {analysis && <ScoreCard analysis={analysis} />}
+            {/* FIXED: Check if analysis exists and has required properties before passing to ScoreCard */}
+            {analysis && analysis.geoScore !== undefined && (
+              <ScoreCard analysis={analysis} />
+            )}
             {competitors.length > 0 && (
               <div>
                 <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">
@@ -479,16 +591,67 @@ const Dashboard = () => {
             <input
               type="text"
               value={websiteUrl}
-              onChange={(e) => setWebsiteUrl(e.target.value)}
-              placeholder="Enter website URL (e.g., https://example.com)"
+              onChange={handleUrlChange}
+              placeholder="Enter website URL (e.g., google.com, www.example.com, https://example.com)"
               className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 transition-all duration-200"
               required
             />
           </div>
+
+          {/* NEW: URL Status Display */}
+          {urlStatus && (
+            <div className={`p-3 rounded-lg border ${
+              urlStatus.isValid 
+                ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700 text-green-700 dark:text-green-300' 
+                : 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700 text-red-700 dark:text-red-300'
+            }`}>
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0 mt-0.5">
+                  {urlStatus.isValid ? (
+                    <CheckCircle className="h-5 w-5" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium">{urlStatus.message}</p>
+                  
+                  {/* Show normalized URL if different */}
+                  {urlStatus.showNormalized && urlStatus.isValid && (
+                    <div className="mt-2 text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded px-3 py-2 border border-blue-200 dark:border-blue-700">
+                      <div className="flex items-center space-x-2">
+                        <Info className="h-4 w-4 flex-shrink-0" />
+                        <div>
+                          <strong>Will analyze:</strong> {urlStatus.normalizedUrl}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Internal URL warning */}
+                  {urlStatus.isInternal && urlStatus.isValid && (
+                    <div className="mt-2 text-sm bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded px-3 py-2 border border-orange-200 dark:border-orange-700">
+                      <div className="flex items-center space-x-2">
+                        <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                        <div>
+                          <strong>Note:</strong> This appears to be an internal/private URL. Analysis may be limited.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={isAnalyzing}
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+            disabled={isAnalyzing || !urlStatus?.isValid}
+            className={`w-full font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl ${
+              urlStatus?.isValid && !isAnalyzing
+                ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white'
+                : 'bg-gray-400 text-white cursor-not-allowed'
+            }`}
           >
             {isAnalyzing ? (
               <>
@@ -502,6 +665,29 @@ const Dashboard = () => {
               </>
             )}
           </button>
+
+          {/* NEW: URL Format Examples */}
+          <div className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+            <p className="font-medium mb-2 text-gray-700 dark:text-gray-300">Supported URL formats:</p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="h-3 w-3 text-green-500" />
+                <span>example.com</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="h-3 w-3 text-green-500" />
+                <span>www.example.com</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="h-3 w-3 text-green-500" />
+                <span>https://example.com</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="h-3 w-3 text-green-500" />
+                <span>localhost:3000</span>
+              </div>
+            </div>
+          </div>
         </form>
 
         {/* Loading Animation */}
@@ -514,6 +700,43 @@ const Dashboard = () => {
               <AlertCircle className="w-5 h-5 flex-shrink-0" />
               <div>
                 <strong>Error:</strong> {error}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* NEW: URL Processing Info */}
+        {analysis && analysis.urlInfo && showUrlInfo && (
+          <div className="max-w-2xl mx-auto mt-4">
+            <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-semibold text-blue-800 dark:text-blue-200 mb-2 flex items-center space-x-2">
+                    <Info className="h-5 w-5" />
+                    <span>URL Processing Information</span>
+                  </h3>
+                  <div className="space-y-2 text-sm text-blue-700 dark:text-blue-300">
+                    <div>
+                      <strong>Original:</strong> {analysis.urlInfo.original}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <strong>Analyzed:</strong> 
+                      <span className="font-mono">{analysis.urlInfo.normalized}</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </div>
+                    {analysis.urlInfo.isInternal && (
+                      <div className="text-orange-600 dark:text-orange-400">
+                        <strong>Note:</strong> Internal/Private URL detected
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowUrlInfo(false)}
+                  className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
+                >
+                  ✕
+                </button>
               </div>
             </div>
           </div>

@@ -1,32 +1,54 @@
-import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+// frontend/src/components/AnimatedCounter.js
+import React, { useState, useEffect } from 'react';
 
-const AnimatedCounter = ({ value, duration = 2000, suffix = '%' }) => {
+const AnimatedCounter = ({ 
+  end, 
+  duration = 1000, 
+  isPercentage = false, 
+  decimals = 0,
+  startDelay = 0 
+}) => {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    let start = 0;
-    const end = parseInt(value);
-    const incrementTime = duration / end;
+    const startTime = Date.now() + startDelay;
+    const endValue = Number(end) || 0;
     
     const timer = setInterval(() => {
-      start += 1;
-      setCount(start);
-      if (start === end) clearInterval(timer);
-    }, incrementTime);
+      const now = Date.now();
+      const elapsed = now - startTime;
+      
+      if (elapsed < 0) return;
+      
+      if (elapsed >= duration) {
+        setCount(endValue);
+        clearInterval(timer);
+        return;
+      }
+
+      const progress = elapsed / duration;
+      const easeOutProgress = 1 - Math.pow(1 - progress, 3);
+      const currentValue = endValue * easeOutProgress;
+      
+      setCount(currentValue);
+    }, 16);
 
     return () => clearInterval(timer);
-  }, [value, duration]);
+  }, [end, duration, startDelay]);
+
+  const formatNumber = (num) => {
+    const value = Number(num) || 0;
+    if (isPercentage) {
+      const rounded = Math.round(value * 100) / 100;
+      return decimals > 0 ? rounded.toFixed(decimals) : Math.round(rounded);
+    }
+    return decimals > 0 ? value.toFixed(decimals) : Math.round(value);
+  };
 
   return (
-    <motion.span
-      initial={{ opacity: 0, scale: 0.5 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.5 }}
-      className="font-bold text-2xl"
-    >
-      {count}{suffix}
-    </motion.span>
+    <span className="tabular-nums">
+      {formatNumber(count)}{isPercentage ? '%' : ''}
+    </span>
   );
 };
 
