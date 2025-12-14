@@ -1,0 +1,17 @@
+{
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/build",
+  "envPrefix": "REACT_APP_",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://webanalysis-api.vercel.app/api/:path*"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/health",
+      "destination": "https://webanalysis-api.vercel.app/health"
+    }
+  ]
+}
