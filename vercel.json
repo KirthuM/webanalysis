@@ -1,16 +1,4 @@
 {
   "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "frontend/build",
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "https://webanalysis-api.vercel.app/api/:path*"
-    }
-  ],
-  "redirects": [
-    {
-      "source": "/health",
-      "destination": "https://webanalysis-api.vercel.app/health"
-    }
-  ]
+  "outputDirectory": "frontend/build"
 }
